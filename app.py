@@ -1,6 +1,16 @@
 from flask import Flask, request, render_template
+import sqlite3
+import datetime
+import google.generativeai as genai
+import os
+
 
 app = Flask(__name__)
+
+flag =1
+api = "AIzaSyA6oZkqV6RlXvvBNavlz_uG92Ed2C9Co3Y"
+model = genai.GenerativeModel("gemini-1.5-flash")
+genai.configure(api_key=api)
 
 @app.route("/", methods=['GET', 'POST'])
 def index():
@@ -8,7 +18,19 @@ def index():
 
 @app.route("/main", methods=['GET', 'POST'])
 def main():
-    user_name = request.form.get("q")
+    global flag
+    if flag ==1:
+        user_name = request.form.get("q")
+        t = datetime.datetime.now()
+        
+        conn = sqlite3.connect('user.db')
+        c = conn.cursor()
+        c.execute("insert into user (name,timestamp)values(?,?)",(user_name,t))
+        conn.commit()
+        c.close()
+        conn.close()
+        flag = 0
+     
     return(render_template("main.html"))
 
 @app.route("/foodexp", methods=["GET", "POST"])
@@ -31,6 +53,38 @@ def test_result():
 def foodexp_pred():
     q = float(request.form.get("q"))
     return(render_template("foodexp_pred.html", r=(q*0.4851)+147.4))
+
+@app.route("/FAQ", methods=["GET", "POST"])
+def FAQ():
+    return(render_template("FAQ.html"))
+
+@app.route("/FAQ1", methods=["GET", "POST"])
+def FAQ1():
+    r = model.generate_content("Factors for profit")
+    return(render_template("FAQ1.html",r=r.candidates[0].content.parts[0].text))
+
+@app.route("/userLog", methods=["GET", "POST"])
+def userLog():
+    conn = sqlite3.connect('user.db')
+    c = conn.cursor()
+    c.execute("select * from user")
+    r = ""
+    for row in c:
+        r += str(row) + "\n"
+    print(r)
+    c.close()
+    conn.close()   
+    return(render_template("userLog.html",r=r))
+
+@app.route("/deleteLog", methods=["GET", "POST"])
+def deleteLog():
+    conn = sqlite3.connect('user.db')
+    c = conn.cursor()
+    c.execute("delete from user")
+    conn.commit()
+    c.close()
+    conn.close()  
+    return(render_template("deleteLog.html"))
 
 if __name__ == "__main__":
     app.run()
